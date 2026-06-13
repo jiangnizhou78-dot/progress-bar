@@ -281,7 +281,7 @@
 
   <!-- 图标固定最高层级，永远置顶不被任何图层遮挡 -->
   <img 
-  :src="item.icon.base64Pic" 
+    :src="imageBaseUrl + item.icon.picture" 
     class="final-icon-img"
     :class="{ iconWhiteLine: item.isWhiteLine }"
     style="position: absolute; z-index: 9999 !important; left: 0; top: 0;"
@@ -700,99 +700,74 @@ handleBottomDrop(e, item, idx) {
 
     const imgs = container.querySelectorAll('.final-icon-img');
     const originalSrcList = [];
-    imgs.forEach(img => originalSrcList.push(img.src));
 
-    // 处理白色线条图标
-    const promises = [];
-    let idx = 0;
-    for (const frame of this.frames) {
-      for (const item of frame.icons) {
-        const img = imgs[idx];
-        if (img && item.isWhiteLine) {
-          const p = new Promise((resolve) => {
-            const tempImg = new Image();
-            tempImg.crossOrigin = null; // 清空跨域属性
-            tempImg.onload = function () {
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              canvas.width = tempImg.naturalWidth;
-              canvas.height = tempImg.naturalHeight;
+    // 1. 保存所有图片的原始地址
+    imgs.forEach(img => {
+      originalSrcList.push(img.src);
+    });
 
-              ctx.drawImage(tempImg, 0, 0);
-              ctx.globalCompositeOperation = 'source-in';
-              ctx.fillStyle = '#FFFFFF';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 2. 关键：下载前，把所有跨域图片转为本地 Base64
+    const convertPromises = [];
+    imgs.forEach((img, index) => {
+      convertPromises.push(new Promise((resolve) => {
+        // 创建一个临时 canvas，把图片画进去，再转成 Base64
+        const tempCanvas = document.createElement('canvas');
+        const ctx = tempCanvas.getContext('2d');
+        tempCanvas.width = img.naturalWidth || img.width;
+        tempCanvas.height = img.naturalHeight || img.height;
 
-              img.src = canvas.toDataURL('image/png');
-              resolve();
-            };
-            tempImg.onerror = () => resolve();
-            tempImg.src = img.src;
-          });
-          promises.push(p);
-        }
-        idx++;
-      }
-    }
+        const tempImg = new Image();
+        tempImg.crossOrigin = 'anonymous'; // 临时设置跨域属性，只用于转换
+        tempImg.onload = () => {
+          ctx.drawImage(tempImg, 0, 0);
+          // 替换为本地 Base64
+          img.src = tempCanvas.toDataURL('image/png');
+          resolve();
+        };
+        tempImg.onerror = () => resolve(); // 即使失败也继续
+        tempImg.src = img.src;
+      }));
+    });
 
-    // 等待所有图片处理完成 + 强制渲染等待
-    await Promise.all(promises);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    await this.$nextTick();
+    // 等待所有图片转换完成
+    await Promise.all(convertPromises);
+    await new Promise(r => setTimeout(r, 200)); // 等待渲染
 
-    // html2canvas 标准配置
+    // 3. 截图（此时所有图片都是本地的，没有跨域问题）
     const canvas = await html2canvas(container, {
       scale: 2,
       backgroundColor: null,
       useCORS: false,
-      allowTaint: false,
-      logging: false,
-      ignoreElements: el => el.classList.contains('el-message')
+      allowTaint: false
     });
 
-    // 优先 toBlob 下载 + 修复 this 指向
-    const downloadByBlob = (cvs) => {
-      return new Promise((resolve, reject) => {
-        cvs.toBlob((blob) => {
-          if (!blob) return reject(new Error("图片数据为空"));
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = `烟花效果_${Date.now()}.png`;
-          link.click();
-          URL.revokeObjectURL(link.href);
-          resolve();
-        }, 'image/png');
-      });
-    };
+    // 4. 下载
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        this.$message.error("截图失败");
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = "烟花效果_" + Date.now() + ".png";
+      link.click();
+      URL.revokeObjectURL(link.href);
+      this.$message.success("导出成功 ✅");
+    }, 'image/png');
 
-    // 执行下载
-    await downloadByBlob(canvas);
-    this.$message.success("导出成功 ✅");
-
-    // 还原图片原始地址
-    imgs.forEach((img, i) => {
-      img.src = originalSrcList[i];
+    // 5. 截图完成后，恢复所有图片的原始地址，不影响后续使用
+    imgs.forEach((img, index) => {
+      img.src = originalSrcList[index];
     });
 
   } catch (err) {
-    console.error("导出异常：", err);
-    // 降级方案：toDataURL 兜底
-    try {
-      const container = this.$refs.screenshotContainer;
-      const canvas = await html2canvas(container, {
-        scale: 2,
-        backgroundColor: null,
-        useCORS: false,
-        allowTaint: false
-      });
-      const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
-      link.download = `烟花效果_${Date.now()}.png`;
-      link.click();
-      this.$message.success("导出成功（备用模式）");
-    } catch (e2) {
-      this.$message.error("导出失败，请重试");
-    }
+    console.error(err);
+    this.$message.error("导出失败：" + err.message);
+    // 兜底：截图失败也要恢复图片
+    const imgs = container.querySelectorAll('.final-icon-img');
+    imgs.forEach((img, index) => {
+      img.src = originalSrcList[index];
+    });
   }
 },
     applyRoundedCorners(sourceCanvas) {
@@ -1237,15 +1212,5 @@ handleBottomDrop(e, item, idx) {
 .download-btn:hover {
   background-color: #0066cc;
   transform: scale(1.02);
-}
-.screenshot-container {
-  width: 1200px !important;
-  height: 250px !important;
-  contain: layout paint size;
-}
-.final-icon-img {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain !important;
 }
 </style>

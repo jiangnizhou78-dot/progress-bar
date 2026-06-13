@@ -694,7 +694,6 @@ handleBottomDrop(e, item, idx) {
   try {
     const container = this.$refs.screenshotContainer;
     const imgs = container.querySelectorAll('.final-icon-img');
-    let idx = 0;
     const originalSrcList = [];
     const promises = [];
 
@@ -704,44 +703,40 @@ handleBottomDrop(e, item, idx) {
     });
 
     // --------------------------
-    // 关键：把所有图片直接画到临时 canvas 再替换，消除污染
+    // 关键：把所有跨域图片转为本地 Data URL，彻底消除污染
     // --------------------------
-    imgs.forEach(img => {
-      promises.push(new Promise((resolve) => {
-        // 1. 创建一个和当前图片一模一样的临时 canvas
+    for (let i = 0; i < imgs.length; i++) {
+      const img = imgs[i];
+      await new Promise((resolve) => {
+        // 创建一个临时 canvas，直接绘制当前已加载的图片
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = img.naturalWidth || img.width;
         tempCanvas.height = img.naturalHeight || img.height;
         const ctx = tempCanvas.getContext('2d');
-
-        // 2. 直接把页面上已经加载好的图片画进去（不发起任何新请求）
-        ctx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
-
-        // 3. 把图片替换成本地 Data URL，彻底消除跨域污染
+        ctx.drawImage(img, 0, 0);
+        // 替换为本地 Data URL
         img.src = tempCanvas.toDataURL('image/png');
         resolve();
-      }));
-    });
+      });
+    }
 
     // 等待所有图片转换完成
-    await Promise.all(promises);
     await new Promise(r => setTimeout(r, 100));
 
     // --------------------------
     // 处理白线图标（你的代码，一行不动）
     // --------------------------
     const whitePromises = [];
-    idx = 0;
+    let idx = 0;
     this.frames.forEach(frame => {
       frame.icons.forEach(item => {
         const img = imgs[idx];
         if (img && item.isWhiteLine) {
-          const p = new Promise((resolve) => {
+          whitePromises.push(new Promise((resolve) => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const image = new Image();
-            // 用已经转好的本地 Data URL，不触发任何跨域
-            image.src = img.src;
+            image.src = img.src; // 用已转好的本地 Data URL
             image.onload = () => {
               canvas.width = image.width;
               canvas.height = image.height;
@@ -752,8 +747,7 @@ handleBottomDrop(e, item, idx) {
               img.src = canvas.toDataURL('image/png');
               resolve();
             };
-          });
-          whitePromises.push(p);
+          }));
         }
         idx++;
       });
@@ -763,7 +757,7 @@ handleBottomDrop(e, item, idx) {
     await new Promise(r => setTimeout(r, 100));
 
     // --------------------------
-    // 截图（此时所有图片都是本地的，没有任何跨域污染）
+    // 截图（此时所有图片都是本地的，无任何跨域污染）
     // --------------------------
     const canvas = await html2canvas(container, {
       useCORS: false,

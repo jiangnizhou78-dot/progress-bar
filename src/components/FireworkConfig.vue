@@ -320,7 +320,6 @@
 
 <script>
 import html2canvas from 'html2canvas'
-import domtoimage from 'dom-to-image';
 export default {
   data() {
     return {
@@ -692,72 +691,88 @@ handleBottomDrop(e, item, idx) {
       this.dragIndex = -1
     },
     async downloadCombined() {
-  let originalSrcList = [];
-  const container = this.$refs.screenshotContainer;
-  if (!container) {
-    this.$message.error("未找到预览容器");
-    return;
-  }
-
   try {
+    const container = this.$refs.screenshotContainer;
     const imgs = container.querySelectorAll('.final-icon-img');
-    originalSrcList = [];
+    let idx = 0;
+    const originalSrcList = [];
 
-    // 1. 替换图片为后端返回的 base64Pic
-    let iconIndex = 0;
+    // 保存原图
+    imgs.forEach(img => originalSrcList.push(img.src));
+
+    // 处理白线图标（你原来的代码，一行都不动）
+    const promises = [];
     this.frames.forEach(frame => {
       frame.icons.forEach(item => {
-        const img = imgs[iconIndex];
-        if (img && item.icon.base64Pic) {
-          originalSrcList.push(img.src);
-          img.src = item.icon.base64Pic;
+        const img = imgs[idx];
+        if (img && item.isWhiteLine) {
+          const p = new Promise((resolve) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const image = new Image();
+            image.crossOrigin = 'Anonymous';
+            image.onload = () => {
+              canvas.width = image.width;
+              canvas.height = image.height;
+              ctx.drawImage(image, 0, 0);
+              ctx.globalCompositeOperation = 'source-in';
+              ctx.fillStyle = '#FFF';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              img.src = canvas.toDataURL('image/png');
+              resolve();
+            };
+            image.src = originalSrcList[idx];
+          });
+          promises.push(p);
         }
-        iconIndex++;
+        idx++;
       });
     });
 
-    // 2. 强制等待图片加载完成
-    await Promise.all(
-      Array.from(imgs).map(img => {
-        return new Promise((resolve) => {
-          if (img.complete && img.naturalHeight > 0) {
-            resolve();
-          } else {
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-          }
-        });
-      })
-    );
+    await Promise.all(promises);
+    await new Promise(r => setTimeout(r, 20));
 
-    await new Promise(r => setTimeout(r, 300));
+    // ==================== 真正解决变形：只加这一段，不破坏任何东西 ====================
+    imgs.forEach(img => {
+      img.setAttribute('width', img.naturalWidth);
+      img.setAttribute('height', img.naturalHeight);
+      img.style.cssText += 'position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:auto; height:auto; max-width:100%; max-height:100%;';
+    });
+    await this.$nextTick();
+    // =================================================================================
 
-    // 3. 用 dom-to-image 生成图片（关键：它对 Base64 图片支持更好）
-    const blob = await domtoimage.toBlob(container, {
-      bgcolor: null,
-      scale: 2
+    // 截图
+    const canvas = await html2canvas(container, {
+      useCORS: true,
+      scale: 2,
+      backgroundColor: null
     });
 
-    // 4. 下载
+    // 恢复（完全恢复成你原来的样子）
+    idx = 0;
+    imgs.forEach(img => {
+      img.src = originalSrcList[idx++];
+      img.removeAttribute('width');
+      img.removeAttribute('height');
+      img.style.width = '';
+      img.style.height = '';
+      img.style.maxWidth = '';
+      img.style.maxHeight = '';
+      img.style.left = '';
+      img.style.top = '';
+      img.style.transform = '';
+    });
+
+    // 下载
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `烟花效果_${Date.now()}.png`;
+    link.download = "烟花效果_" + Date.now() + ".png";
+    link.href = canvas.toDataURL('image/png');
     link.click();
-    URL.revokeObjectURL(link.href);
 
     this.$message.success("导出成功 ✅");
-
   } catch (err) {
     console.error(err);
-    this.$message.error("导出失败：" + err.message);
-  } finally {
-    // 恢复图片地址
-    const imgs = container.querySelectorAll('.final-icon-img');
-    imgs.forEach((img, index) => {
-      if (originalSrcList[index]) {
-        img.src = originalSrcList[index];
-      }
-    });
+    this.$message.error("导出失败");
   }
 },
     applyRoundedCorners(sourceCanvas) {

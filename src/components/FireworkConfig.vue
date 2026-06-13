@@ -697,35 +697,39 @@ handleBottomDrop(e, item, idx) {
     let idx = 0;
     const originalSrcList = [];
 
-    // 保存原图地址，同时把跨域图片转为 Data URL
-    const convertPromises = [];
+    // 保存原图地址
     imgs.forEach(img => {
       originalSrcList.push(img.src);
-      // 把图片转成 Data URL，避开跨域
-      convertPromises.push(new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', img.src);
-        xhr.responseType = 'blob';
-        xhr.onload = function() {
-          const reader = new FileReader();
-          reader.onloadend = function() {
-            img.src = reader.result; // 替换为本地 Data URL
-            resolve();
-          };
-          reader.readAsDataURL(xhr.response);
+    });
+
+    // 关键：在前端直接把跨域图片画到临时 Canvas 上，再替换成 Data URL
+    const convertPromises = [];
+    imgs.forEach(img => {
+      convertPromises.push(new Promise((resolve) => {
+        const tempImg = new Image();
+        tempImg.crossOrigin = 'anonymous';
+        tempImg.onload = () => {
+          // 把图片画到临时 Canvas 上
+          const canvas = document.createElement('canvas');
+          canvas.width = tempImg.naturalWidth;
+          canvas.height = tempImg.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(tempImg, 0, 0);
+          // 替换为本地 Data URL，不再跨域
+          img.src = canvas.toDataURL('image/png');
+          resolve();
         };
-        xhr.onerror = function() {
-          resolve(); // 即使失败也继续执行
-        };
-        xhr.send();
+        tempImg.onerror = () => resolve();
+        tempImg.src = img.src;
       }));
     });
 
-    // 等待所有图片转成 Data URL
+    // 等待所有图片转成本地 Data URL
     await Promise.all(convertPromises);
 
     // 处理白线图标（你原来的代码，一行都不动）
     const promises = [];
+    idx = 0;
     this.frames.forEach(frame => {
       frame.icons.forEach(item => {
         const img = imgs[idx];
@@ -734,7 +738,6 @@ handleBottomDrop(e, item, idx) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const image = new Image();
-            image.crossOrigin = 'Anonymous';
             image.onload = () => {
               canvas.width = image.width;
               canvas.height = image.height;
@@ -745,7 +748,7 @@ handleBottomDrop(e, item, idx) {
               img.src = canvas.toDataURL('image/png');
               resolve();
             };
-            image.src = img.src; // 用已经转好的 Data URL
+            image.src = img.src;
           });
           promises.push(p);
         }
@@ -754,38 +757,20 @@ handleBottomDrop(e, item, idx) {
     });
 
     await Promise.all(promises);
-    await new Promise(r => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 100));
 
-    // ==================== 真正解决变形：只加这一段，不破坏任何东西 ====================
-    imgs.forEach(img => {
-      img.setAttribute('width', img.naturalWidth);
-      img.setAttribute('height', img.naturalHeight);
-      img.style.cssText += 'position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:auto; height:auto; max-width:100%; max-height:100%;';
-    });
-    await this.$nextTick();
-    // =================================================================================
-
-    // 截图（此时图片已经是本地 Data URL，无跨域问题）
+    // 截图（此时所有图片都是本地 Data URL，无任何跨域）
     const canvas = await html2canvas(container, {
-      useCORS: true,
-      allowTaint: false,
+      useCORS: false,
+      allowTaint: true,
       scale: 2,
       backgroundColor: null
     });
 
-    // 恢复（完全恢复成你原来的样子）
+    // 恢复原图地址
     idx = 0;
     imgs.forEach(img => {
       img.src = originalSrcList[idx++];
-      img.removeAttribute('width');
-      img.removeAttribute('height');
-      img.style.width = '';
-      img.style.height = '';
-      img.style.maxWidth = '';
-      img.style.maxHeight = '';
-      img.style.left = '';
-      img.style.top = '';
-      img.style.transform = '';
     });
 
     // 下载

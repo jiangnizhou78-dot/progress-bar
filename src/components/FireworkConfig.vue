@@ -281,7 +281,7 @@
 
   <!-- 图标固定最高层级，永远置顶不被任何图层遮挡 -->
   <img 
-    :src="imageBaseUrl + item.icon.picture" 
+  :src="item.icon.base64Pic" 
     class="final-icon-img"
     :class="{ iconWhiteLine: item.isWhiteLine }"
     style="position: absolute; z-index: 9999 !important; left: 0; top: 0;"
@@ -693,78 +693,106 @@ handleBottomDrop(e, item, idx) {
     async downloadCombined() {
   try {
     const container = this.$refs.screenshotContainer;
-    const imgs = container.querySelectorAll('.final-icon-img');
-    let idx = 0;
-    const originalSrcList = [];
+    if (!container) {
+      this.$message.error("未找到预览容器");
+      return;
+    }
 
-    // 保存原图地址（现在都是 Base64，无跨域）
+    const imgs = container.querySelectorAll('.final-icon-img');
+    const originalSrcList = [];
     imgs.forEach(img => originalSrcList.push(img.src));
 
-    // 处理白线图标（你的逻辑不动）
+    // 处理白色线条图标
     const promises = [];
-    this.frames.forEach(frame => {
-      frame.icons.forEach(item => {
+    let idx = 0;
+    for (const frame of this.frames) {
+      for (const item of frame.icons) {
         const img = imgs[idx];
         if (img && item.isWhiteLine) {
           const p = new Promise((resolve) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const image = new Image();
-            image.onload = () => {
-              canvas.width = image.width;
-              canvas.height = image.height;
-              ctx.drawImage(image, 0, 0);
+            const tempImg = new Image();
+            tempImg.crossOrigin = null; // 清空跨域属性
+            tempImg.onload = function () {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              canvas.width = tempImg.naturalWidth;
+              canvas.height = tempImg.naturalHeight;
+
+              ctx.drawImage(tempImg, 0, 0);
               ctx.globalCompositeOperation = 'source-in';
-              ctx.fillStyle = '#FFF';
+              ctx.fillStyle = '#FFFFFF';
               ctx.fillRect(0, 0, canvas.width, canvas.height);
+
               img.src = canvas.toDataURL('image/png');
               resolve();
             };
-            image.src = img.src;
+            tempImg.onerror = () => resolve();
+            tempImg.src = img.src;
           });
           promises.push(p);
         }
         idx++;
-      });
-    });
+      }
+    }
 
+    // 等待所有图片处理完成 + 强制渲染等待
     await Promise.all(promises);
-    await new Promise(r => setTimeout(r, 200)); // 等待白线图标渲染
+    await new Promise(resolve => setTimeout(resolve, 300));
+    await this.$nextTick();
 
-    // 截图配置（不使用跨域参数，因为已经是 Base64）
+    // html2canvas 标准配置
     const canvas = await html2canvas(container, {
       scale: 2,
       backgroundColor: null,
       useCORS: false,
       allowTaint: false,
-      logging: false
+      logging: false,
+      ignoreElements: el => el.classList.contains('el-message')
     });
 
-    // --------------------------
-    // 关键：用 toBlob 方式下载，避免数据损坏
-    // --------------------------
-    canvas.toBlob(function(blob) {
-      if (!blob) {
-        this.$message.error("截图失败，生成的图片数据为空");
-        return;
-      }
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = "烟花效果_" + Date.now() + ".png";
-      link.click();
-      URL.revokeObjectURL(link.href); // 释放内存
-    }, 'image/png');
+    // 优先 toBlob 下载 + 修复 this 指向
+    const downloadByBlob = (cvs) => {
+      return new Promise((resolve, reject) => {
+        cvs.toBlob((blob) => {
+          if (!blob) return reject(new Error("图片数据为空"));
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `烟花效果_${Date.now()}.png`;
+          link.click();
+          URL.revokeObjectURL(link.href);
+          resolve();
+        }, 'image/png');
+      });
+    };
 
-    // 恢复图片地址
-    idx = 0;
-    imgs.forEach(img => {
-      img.src = originalSrcList[idx++];
-    });
-
+    // 执行下载
+    await downloadByBlob(canvas);
     this.$message.success("导出成功 ✅");
+
+    // 还原图片原始地址
+    imgs.forEach((img, i) => {
+      img.src = originalSrcList[i];
+    });
+
   } catch (err) {
-    console.error(err);
-    this.$message.error("导出失败：" + err.message);
+    console.error("导出异常：", err);
+    // 降级方案：toDataURL 兜底
+    try {
+      const container = this.$refs.screenshotContainer;
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        backgroundColor: null,
+        useCORS: false,
+        allowTaint: false
+      });
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `烟花效果_${Date.now()}.png`;
+      link.click();
+      this.$message.success("导出成功（备用模式）");
+    } catch (e2) {
+      this.$message.error("导出失败，请重试");
+    }
   }
 },
     applyRoundedCorners(sourceCanvas) {
@@ -1209,5 +1237,15 @@ handleBottomDrop(e, item, idx) {
 .download-btn:hover {
   background-color: #0066cc;
   transform: scale(1.02);
+}
+.screenshot-container {
+  width: 1200px !important;
+  height: 250px !important;
+  contain: layout paint size;
+}
+.final-icon-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
 }
 </style>

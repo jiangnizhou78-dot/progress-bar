@@ -336,7 +336,7 @@ export default {
       loading: false,
       iconList: [],
       selectedIcons: [],
-      imageBaseUrl: 'http://localhost:9090/image/iconPicture/',
+      imageBaseUrl: process.env.NODE_ENV === 'development' ? 'http://localhost:9090/image/iconPicture/' : 'https://progressbar-production-7a7b.up.railway.app/image/iconPicture/',
       config: {
         frameCount: 5,
         maxSingle: 5

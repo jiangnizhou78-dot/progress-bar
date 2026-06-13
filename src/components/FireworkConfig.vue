@@ -743,7 +743,6 @@ handleBottomDrop(e, item, idx) {
 
     // 截图
     const canvas = await html2canvas(container, {
-      useCORS: true,
       scale: 2,
       backgroundColor: null
     });

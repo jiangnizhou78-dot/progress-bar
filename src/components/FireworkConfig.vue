@@ -691,49 +691,51 @@ handleBottomDrop(e, item, idx) {
       this.dragIndex = -1
     },
     async downloadCombined() {
-  try {
-    const container = this.$refs.screenshotContainer;
-    if (!container) {
-      this.$message.error("未找到预览容器");
-      return;
-    }
+  // 提前声明，避免作用域问题
+  let originalSrcList = [];
+  const container = this.$refs.screenshotContainer;
+  if (!container) {
+    this.$message.error("未找到预览容器");
+    return;
+  }
 
+  try {
     const imgs = container.querySelectorAll('.final-icon-img');
-    const originalSrcList = [];
+    originalSrcList = [];
 
     // 1. 保存所有图片的原始地址
     imgs.forEach(img => {
       originalSrcList.push(img.src);
     });
 
-    // 2. 关键：下载前，把所有跨域图片转为本地 Base64
+    // 2. 下载前，把所有跨域图片转为本地 Base64
     const convertPromises = [];
-    imgs.forEach((img, index) => {
+    imgs.forEach((img) => {
       convertPromises.push(new Promise((resolve) => {
-        // 创建一个临时 canvas，把图片画进去，再转成 Base64
+        // 创建临时 canvas
         const tempCanvas = document.createElement('canvas');
         const ctx = tempCanvas.getContext('2d');
-        tempCanvas.width = img.naturalWidth || img.width;
-        tempCanvas.height = img.naturalHeight || img.height;
-
         const tempImg = new Image();
-        tempImg.crossOrigin = 'anonymous'; // 临时设置跨域属性，只用于转换
+        tempImg.crossOrigin = 'anonymous';
+        
         tempImg.onload = () => {
+          tempCanvas.width = tempImg.naturalWidth;
+          tempCanvas.height = tempImg.naturalHeight;
           ctx.drawImage(tempImg, 0, 0);
           // 替换为本地 Base64
           img.src = tempCanvas.toDataURL('image/png');
           resolve();
         };
-        tempImg.onerror = () => resolve(); // 即使失败也继续
+        tempImg.onerror = () => resolve();
         tempImg.src = img.src;
       }));
     });
 
     // 等待所有图片转换完成
     await Promise.all(convertPromises);
-    await new Promise(r => setTimeout(r, 200)); // 等待渲染
+    await new Promise(r => setTimeout(r, 200));
 
-    // 3. 截图（此时所有图片都是本地的，没有跨域问题）
+    // 3. 截图（此时所有图片都是本地的）
     const canvas = await html2canvas(container, {
       scale: 2,
       backgroundColor: null,
@@ -755,18 +757,16 @@ handleBottomDrop(e, item, idx) {
       this.$message.success("导出成功 ✅");
     }, 'image/png');
 
-    // 5. 截图完成后，恢复所有图片的原始地址，不影响后续使用
-    imgs.forEach((img, index) => {
-      img.src = originalSrcList[index];
-    });
-
   } catch (err) {
     console.error(err);
     this.$message.error("导出失败：" + err.message);
-    // 兜底：截图失败也要恢复图片
+  } finally {
+    // 无论成功失败，都恢复图片地址
     const imgs = container.querySelectorAll('.final-icon-img');
     imgs.forEach((img, index) => {
-      img.src = originalSrcList[index];
+      if (originalSrcList[index]) {
+        img.src = originalSrcList[index];
+      }
     });
   }
 },

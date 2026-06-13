@@ -285,6 +285,7 @@
     class="final-icon-img"
     :class="{ iconWhiteLine: item.isWhiteLine }"
     style="position: absolute; z-index: 9999 !important; left: 0; top: 0;"
+    crossorigin="anonymous"
   >
 </div>
                     </div>
@@ -695,7 +696,6 @@ handleBottomDrop(e, item, idx) {
     const container = this.$refs.screenshotContainer;
     const imgs = container.querySelectorAll('.final-icon-img');
     const originalSrcList = [];
-    const promises = [];
 
     // 保存原图地址
     imgs.forEach(img => {
@@ -703,20 +703,34 @@ handleBottomDrop(e, item, idx) {
     });
 
     // --------------------------
-    // 关键：把所有跨域图片转为本地 Data URL，彻底消除污染
+    // 1. 强制同步：把所有跨域图片转为本地 Data URL
     // --------------------------
     for (let i = 0; i < imgs.length; i++) {
       const img = imgs[i];
       await new Promise((resolve) => {
-        // 创建一个临时 canvas，直接绘制当前已加载的图片
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = img.naturalWidth || img.width;
-        tempCanvas.height = img.naturalHeight || img.height;
-        const ctx = tempCanvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        // 替换为本地 Data URL
-        img.src = tempCanvas.toDataURL('image/png');
-        resolve();
+        // 等待图片加载完成
+        if (img.complete && img.naturalHeight > 0) {
+          // 直接绘制到临时 canvas
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = img.naturalWidth;
+          tempCanvas.height = img.naturalHeight;
+          const ctx = tempCanvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          // 替换为本地 Data URL
+          img.src = tempCanvas.toDataURL('image/png');
+          resolve();
+        } else {
+          img.onload = () => {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = img.naturalWidth;
+            tempCanvas.height = img.naturalHeight;
+            const ctx = tempCanvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            img.src = tempCanvas.toDataURL('image/png');
+            resolve();
+          };
+          img.onerror = resolve;
+        }
       });
     }
 
@@ -724,7 +738,7 @@ handleBottomDrop(e, item, idx) {
     await new Promise(r => setTimeout(r, 100));
 
     // --------------------------
-    // 处理白线图标（你的代码，一行不动）
+    // 2. 处理白线图标（你的逻辑不动）
     // --------------------------
     const whitePromises = [];
     let idx = 0;
@@ -736,7 +750,7 @@ handleBottomDrop(e, item, idx) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const image = new Image();
-            image.src = img.src; // 用已转好的本地 Data URL
+            image.src = img.src;
             image.onload = () => {
               canvas.width = image.width;
               canvas.height = image.height;
@@ -757,7 +771,7 @@ handleBottomDrop(e, item, idx) {
     await new Promise(r => setTimeout(r, 100));
 
     // --------------------------
-    // 截图（此时所有图片都是本地的，无任何跨域污染）
+    // 3. 截图（此时所有图片都是本地的，无任何跨域污染）
     // --------------------------
     const canvas = await html2canvas(container, {
       useCORS: false,
@@ -767,7 +781,7 @@ handleBottomDrop(e, item, idx) {
     });
 
     // --------------------------
-    // 恢复原图地址，不影响后续使用
+    // 4. 恢复原图地址
     // --------------------------
     idx = 0;
     imgs.forEach(img => {

@@ -691,7 +691,6 @@ handleBottomDrop(e, item, idx) {
       this.dragIndex = -1
     },
     async downloadCombined() {
-  // 提前声明，避免作用域问题
   let originalSrcList = [];
   const container = this.$refs.screenshotContainer;
   if (!container) {
@@ -703,39 +702,25 @@ handleBottomDrop(e, item, idx) {
     const imgs = container.querySelectorAll('.final-icon-img');
     originalSrcList = [];
 
-    // 1. 保存所有图片的原始地址
-    imgs.forEach(img => {
-      originalSrcList.push(img.src);
+    // 遍历图片，同时拿到对应 item 的 base64Pic
+    let iconIndex = 0;
+    this.frames.forEach(frame => {
+      frame.icons.forEach(item => {
+        const img = imgs[iconIndex];
+        if (img && item.icon.base64Pic) {
+          originalSrcList.push(img.src);
+          // 直接用后端返回的 base64，无网络请求
+          img.src = item.icon.base64Pic;
+        }
+        iconIndex++;
+      });
     });
 
-    // 2. 下载前，把所有跨域图片转为本地 Base64
-    const convertPromises = [];
-    imgs.forEach((img) => {
-      convertPromises.push(new Promise((resolve) => {
-        // 创建临时 canvas
-        const tempCanvas = document.createElement('canvas');
-        const ctx = tempCanvas.getContext('2d');
-        const tempImg = new Image();
-        tempImg.crossOrigin = 'anonymous';
-        
-        tempImg.onload = () => {
-          tempCanvas.width = tempImg.naturalWidth;
-          tempCanvas.height = tempImg.naturalHeight;
-          ctx.drawImage(tempImg, 0, 0);
-          // 替换为本地 Base64
-          img.src = tempCanvas.toDataURL('image/png');
-          resolve();
-        };
-        tempImg.onerror = () => resolve();
-        tempImg.src = img.src;
-      }));
-    });
-
-    // 等待所有图片转换完成
-    await Promise.all(convertPromises);
+    // 等待 DOM 渲染完成
+    await this.$nextTick();
     await new Promise(r => setTimeout(r, 200));
 
-    // 3. 截图（此时所有图片都是本地的）
+    // 执行截图
     const canvas = await html2canvas(container, {
       scale: 2,
       backgroundColor: null,
@@ -743,7 +728,7 @@ handleBottomDrop(e, item, idx) {
       allowTaint: false
     });
 
-    // 4. 下载
+    // 下载图片
     canvas.toBlob((blob) => {
       if (!blob) {
         this.$message.error("截图失败");
@@ -761,7 +746,7 @@ handleBottomDrop(e, item, idx) {
     console.error(err);
     this.$message.error("导出失败：" + err.message);
   } finally {
-    // 无论成功失败，都恢复图片地址
+    // 强制还原预览图地址，保证页面正常
     const imgs = container.querySelectorAll('.final-icon-img');
     imgs.forEach((img, index) => {
       if (originalSrcList[index]) {

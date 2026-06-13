@@ -336,7 +336,9 @@ export default {
       loading: false,
       iconList: [],
       selectedIcons: [],
-      imageBaseUrl: process.env.NODE_ENV === 'development' ? 'http://localhost:9090/image/iconPicture/' : 'https://progressbar-production-7a7b.up.railway.app/image/iconPicture/',
+      imageBaseUrl: process.env.NODE_ENV === 'development' 
+  ? 'http://localhost:9090/image/iconPicture/' 
+  : '/image/iconPicture/', // 线上改成相对路径，走Vercel代理
       config: {
         frameCount: 5,
         maxSingle: 5

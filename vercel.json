@@ -1,8 +1,18 @@
 {
-    "rewrites": [
-      {
-        "source": "/api/(.*)",
-        "destination": "https://progressbar-production-7a7b.up.railway.app/$1"
-      }
-    ]
-  }
+  "rewrites": [
+    
+    {
+      "source": "/api/:path*",
+      "destination": "https://progressbar-production-7a7b.up.railway.app/:path*"
+    },
+    {
+      "source": "/image/:path*",
+      "destination": "https://progressbar-production-7a7b.up.railway.app/image/:path*"
+    },
+    
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -320,6 +320,7 @@
 
 <script>
 import html2canvas from 'html2canvas'
+import domtoimage from 'dom-to-image';
 export default {
   data() {
     return {
@@ -702,7 +703,7 @@ handleBottomDrop(e, item, idx) {
     const imgs = container.querySelectorAll('.final-icon-img');
     originalSrcList = [];
 
-    // 1. 把图片替换成后端返回的 base64Pic（无网络请求）
+    // 1. 替换图片为后端返回的 base64Pic
     let iconIndex = 0;
     this.frames.forEach(frame => {
       frame.icons.forEach(item => {
@@ -715,12 +716,12 @@ handleBottomDrop(e, item, idx) {
       });
     });
 
-    // 2. 关键：强制等待所有 base64 图片加载完成
+    // 2. 强制等待图片加载完成
     await Promise.all(
       Array.from(imgs).map(img => {
         return new Promise((resolve) => {
           if (img.complete && img.naturalHeight > 0) {
-            resolve(); // 图片已经加载完成
+            resolve();
           } else {
             img.onload = () => resolve();
             img.onerror = () => resolve();
@@ -729,36 +730,28 @@ handleBottomDrop(e, item, idx) {
       })
     );
 
-    // 再额外等待 300ms，确保浏览器把图片渲染到页面上
     await new Promise(r => setTimeout(r, 300));
 
-    // 3. 截图（此时所有图片都已经渲染完成）
-    const canvas = await html2canvas(container, {
-      scale: 2,
-      backgroundColor: null,
-      useCORS: false,
-      allowTaint: false
+    // 3. 用 dom-to-image 生成图片（关键：它对 Base64 图片支持更好）
+    const blob = await domtoimage.toBlob(container, {
+      bgcolor: null,
+      scale: 2
     });
 
     // 4. 下载
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        this.$message.error("截图失败");
-        return;
-      }
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = "烟花效果_" + Date.now() + ".png";
-      link.click();
-      URL.revokeObjectURL(link.href);
-      this.$message.success("导出成功 ✅");
-    }, 'image/png');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `烟花效果_${Date.now()}.png`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    this.$message.success("导出成功 ✅");
 
   } catch (err) {
     console.error(err);
     this.$message.error("导出失败：" + err.message);
   } finally {
-    // 强制还原预览图地址，保证页面正常
+    // 恢复图片地址
     const imgs = container.querySelectorAll('.final-icon-img');
     imgs.forEach((img, index) => {
       if (originalSrcList[index]) {

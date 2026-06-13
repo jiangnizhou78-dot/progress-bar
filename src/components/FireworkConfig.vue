@@ -700,7 +700,7 @@ handleBottomDrop(e, item, idx) {
     // 保存原图
     imgs.forEach(img => originalSrcList.push(img.src));
 
-    // 处理白线图标（你原来的代码，一行都不动）
+    // 处理白线图标（你原有逻辑完全保留）
     const promises = [];
     this.frames.forEach(frame => {
       frame.icons.forEach(item => {
@@ -710,7 +710,6 @@ handleBottomDrop(e, item, idx) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const image = new Image();
-            image.crossOrigin = 'Anonymous';
             image.onload = () => {
               canvas.width = image.width;
               canvas.height = image.height;
@@ -732,22 +731,21 @@ handleBottomDrop(e, item, idx) {
     await Promise.all(promises);
     await new Promise(r => setTimeout(r, 20));
 
-    // ==================== 真正解决变形：只加这一段，不破坏任何东西 ====================
+    // 原有尺寸修复代码保留
     imgs.forEach(img => {
       img.setAttribute('width', img.naturalWidth);
       img.setAttribute('height', img.naturalHeight);
       img.style.cssText += 'position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:auto; height:auto; max-width:100%; max-height:100%;';
     });
     await this.$nextTick();
-    // =================================================================================
 
-    // 截图
+    // html2canvas 标准配置，无需跨域参数
     const canvas = await html2canvas(container, {
       scale: 2,
       backgroundColor: null
     });
 
-    // 恢复（完全恢复成你原来的样子）
+    // 恢复图片
     idx = 0;
     imgs.forEach(img => {
       img.src = originalSrcList[idx++];

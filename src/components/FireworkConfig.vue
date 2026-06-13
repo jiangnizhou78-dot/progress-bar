@@ -698,7 +698,11 @@ handleBottomDrop(e, item, idx) {
     const originalSrcList = [];
 
     // 保存原图
-    imgs.forEach(img => originalSrcList.push(img.src));
+    imgs.forEach(img => {
+      originalSrcList.push(img.src);
+      // ✅ 新增：给图片加上跨域属性，不影响预览
+      img.crossOrigin = 'Anonymous';
+    });
 
     // 处理白线图标（你原来的代码，一行都不动）
     const promises = [];
@@ -744,6 +748,7 @@ handleBottomDrop(e, item, idx) {
     // 截图
     const canvas = await html2canvas(container, {
       useCORS: true,
+      allowTaint: false, // ✅ 新增：和 useCORS 配对使用，避免画布被污染
       scale: 2,
       backgroundColor: null
     });
@@ -761,6 +766,8 @@ handleBottomDrop(e, item, idx) {
       img.style.left = '';
       img.style.top = '';
       img.style.transform = '';
+      // ✅ 新增：恢复时移除跨域属性，避免影响后续预览
+      img.crossOrigin = null;
     });
 
     // 下载

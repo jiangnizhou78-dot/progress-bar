@@ -697,10 +697,10 @@ handleBottomDrop(e, item, idx) {
     let idx = 0;
     const originalSrcList = [];
 
-    // 保存原图
+    // 保存原图地址（现在都是 Base64，无跨域）
     imgs.forEach(img => originalSrcList.push(img.src));
 
-    // 处理白线图标（你原有逻辑完全保留）
+    // 处理白线图标（你的逻辑不动）
     const promises = [];
     this.frames.forEach(frame => {
       frame.icons.forEach(item => {
@@ -720,7 +720,7 @@ handleBottomDrop(e, item, idx) {
               img.src = canvas.toDataURL('image/png');
               resolve();
             };
-            image.src = originalSrcList[idx];
+            image.src = img.src;
           });
           promises.push(p);
         }
@@ -729,47 +729,42 @@ handleBottomDrop(e, item, idx) {
     });
 
     await Promise.all(promises);
-    await new Promise(r => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, 200)); // 等待白线图标渲染
 
-    // 原有尺寸修复代码保留
-    imgs.forEach(img => {
-      img.setAttribute('width', img.naturalWidth);
-      img.setAttribute('height', img.naturalHeight);
-      img.style.cssText += 'position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:auto; height:auto; max-width:100%; max-height:100%;';
-    });
-    await this.$nextTick();
-
-    // html2canvas 标准配置，无需跨域参数
+    // 截图配置（不使用跨域参数，因为已经是 Base64）
     const canvas = await html2canvas(container, {
       scale: 2,
-      backgroundColor: null
+      backgroundColor: null,
+      useCORS: false,
+      allowTaint: false,
+      logging: false
     });
 
-    // 恢复图片
+    // --------------------------
+    // 关键：用 toBlob 方式下载，避免数据损坏
+    // --------------------------
+    canvas.toBlob(function(blob) {
+      if (!blob) {
+        this.$message.error("截图失败，生成的图片数据为空");
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = "烟花效果_" + Date.now() + ".png";
+      link.click();
+      URL.revokeObjectURL(link.href); // 释放内存
+    }, 'image/png');
+
+    // 恢复图片地址
     idx = 0;
     imgs.forEach(img => {
       img.src = originalSrcList[idx++];
-      img.removeAttribute('width');
-      img.removeAttribute('height');
-      img.style.width = '';
-      img.style.height = '';
-      img.style.maxWidth = '';
-      img.style.maxHeight = '';
-      img.style.left = '';
-      img.style.top = '';
-      img.style.transform = '';
     });
-
-    // 下载
-    const link = document.createElement('a');
-    link.download = "烟花效果_" + Date.now() + ".png";
-    link.href = canvas.toDataURL('image/png');
-    link.click();
 
     this.$message.success("导出成功 ✅");
   } catch (err) {
     console.error(err);
-    this.$message.error("导出失败");
+    this.$message.error("导出失败：" + err.message);
   }
 },
     applyRoundedCorners(sourceCanvas) {

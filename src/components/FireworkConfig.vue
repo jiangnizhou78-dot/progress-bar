@@ -743,10 +743,12 @@ handleBottomDrop(e, item, idx) {
 
     // 截图
     const canvas = await html2canvas(container, {
-      useCORS: true,
-      scale: 2,
-      backgroundColor: null
-    });
+  useCORS: true,
+  allowTaint: true, // 加上这行，允许跨域图片渲染
+  scale: 2,
+  backgroundColor: null,
+  logging: false // 关闭多余日志
+});
 
     // 恢复（完全恢复成你原来的样子）
     idx = 0;

@@ -697,12 +697,32 @@ handleBottomDrop(e, item, idx) {
     let idx = 0;
     const originalSrcList = [];
 
-    // 保存原图
+    // 保存原图地址，同时把跨域图片转为 Data URL
+    const convertPromises = [];
     imgs.forEach(img => {
       originalSrcList.push(img.src);
-      // ✅ 新增：给图片加上跨域属性，不影响预览
-      img.crossOrigin = 'Anonymous';
+      // 把图片转成 Data URL，避开跨域
+      convertPromises.push(new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', img.src);
+        xhr.responseType = 'blob';
+        xhr.onload = function() {
+          const reader = new FileReader();
+          reader.onloadend = function() {
+            img.src = reader.result; // 替换为本地 Data URL
+            resolve();
+          };
+          reader.readAsDataURL(xhr.response);
+        };
+        xhr.onerror = function() {
+          resolve(); // 即使失败也继续执行
+        };
+        xhr.send();
+      }));
     });
+
+    // 等待所有图片转成 Data URL
+    await Promise.all(convertPromises);
 
     // 处理白线图标（你原来的代码，一行都不动）
     const promises = [];
@@ -725,7 +745,7 @@ handleBottomDrop(e, item, idx) {
               img.src = canvas.toDataURL('image/png');
               resolve();
             };
-            image.src = originalSrcList[idx];
+            image.src = img.src; // 用已经转好的 Data URL
           });
           promises.push(p);
         }
@@ -745,10 +765,10 @@ handleBottomDrop(e, item, idx) {
     await this.$nextTick();
     // =================================================================================
 
-    // 截图
+    // 截图（此时图片已经是本地 Data URL，无跨域问题）
     const canvas = await html2canvas(container, {
       useCORS: true,
-      allowTaint: false, // ✅ 新增：和 useCORS 配对使用，避免画布被污染
+      allowTaint: false,
       scale: 2,
       backgroundColor: null
     });
@@ -766,8 +786,6 @@ handleBottomDrop(e, item, idx) {
       img.style.left = '';
       img.style.top = '';
       img.style.transform = '';
-      // ✅ 新增：恢复时移除跨域属性，避免影响后续预览
-      img.crossOrigin = null;
     });
 
     // 下载

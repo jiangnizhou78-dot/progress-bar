@@ -285,7 +285,6 @@
     class="final-icon-img"
     :class="{ iconWhiteLine: item.isWhiteLine }"
     style="position: absolute; z-index: 9999 !important; left: 0; top: 0;"
-    crossorigin="anonymous"
   >
 </div>
                     </div>
@@ -695,62 +694,22 @@ handleBottomDrop(e, item, idx) {
   try {
     const container = this.$refs.screenshotContainer;
     const imgs = container.querySelectorAll('.final-icon-img');
+    let idx = 0;
     const originalSrcList = [];
 
-    // 保存原图地址
-    imgs.forEach(img => {
-      originalSrcList.push(img.src);
-    });
+    // 保存原图
+    imgs.forEach(img => originalSrcList.push(img.src));
 
-    // --------------------------
-    // 1. 强制同步：把所有跨域图片转为本地 Data URL
-    // --------------------------
-    for (let i = 0; i < imgs.length; i++) {
-      const img = imgs[i];
-      await new Promise((resolve) => {
-        // 等待图片加载完成
-        if (img.complete && img.naturalHeight > 0) {
-          // 直接绘制到临时 canvas
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = img.naturalWidth;
-          tempCanvas.height = img.naturalHeight;
-          const ctx = tempCanvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-          // 替换为本地 Data URL
-          img.src = tempCanvas.toDataURL('image/png');
-          resolve();
-        } else {
-          img.onload = () => {
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = img.naturalWidth;
-            tempCanvas.height = img.naturalHeight;
-            const ctx = tempCanvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
-            img.src = tempCanvas.toDataURL('image/png');
-            resolve();
-          };
-          img.onerror = resolve;
-        }
-      });
-    }
-
-    // 等待所有图片转换完成
-    await new Promise(r => setTimeout(r, 100));
-
-    // --------------------------
-    // 2. 处理白线图标（你的逻辑不动）
-    // --------------------------
-    const whitePromises = [];
-    let idx = 0;
+    // 处理白线图标（你原有逻辑完全保留）
+    const promises = [];
     this.frames.forEach(frame => {
       frame.icons.forEach(item => {
         const img = imgs[idx];
         if (img && item.isWhiteLine) {
-          whitePromises.push(new Promise((resolve) => {
+          const p = new Promise((resolve) => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const image = new Image();
-            image.src = img.src;
             image.onload = () => {
               canvas.width = image.width;
               canvas.height = image.height;
@@ -761,31 +720,44 @@ handleBottomDrop(e, item, idx) {
               img.src = canvas.toDataURL('image/png');
               resolve();
             };
-          }));
+            image.src = originalSrcList[idx];
+          });
+          promises.push(p);
         }
         idx++;
       });
     });
 
-    await Promise.all(whitePromises);
-    await new Promise(r => setTimeout(r, 100));
+    await Promise.all(promises);
+    await new Promise(r => setTimeout(r, 20));
 
-    // --------------------------
-    // 3. 截图（此时所有图片都是本地的，无任何跨域污染）
-    // --------------------------
+    // 原有尺寸修复代码保留
+    imgs.forEach(img => {
+      img.setAttribute('width', img.naturalWidth);
+      img.setAttribute('height', img.naturalHeight);
+      img.style.cssText += 'position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:auto; height:auto; max-width:100%; max-height:100%;';
+    });
+    await this.$nextTick();
+
+    // html2canvas 标准配置，无需跨域参数
     const canvas = await html2canvas(container, {
-      useCORS: false,
-      allowTaint: false,
       scale: 2,
       backgroundColor: null
     });
 
-    // --------------------------
-    // 4. 恢复原图地址
-    // --------------------------
+    // 恢复图片
     idx = 0;
     imgs.forEach(img => {
       img.src = originalSrcList[idx++];
+      img.removeAttribute('width');
+      img.removeAttribute('height');
+      img.style.width = '';
+      img.style.height = '';
+      img.style.maxWidth = '';
+      img.style.maxHeight = '';
+      img.style.left = '';
+      img.style.top = '';
+      img.style.transform = '';
     });
 
     // 下载

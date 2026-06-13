@@ -702,25 +702,37 @@ handleBottomDrop(e, item, idx) {
     const imgs = container.querySelectorAll('.final-icon-img');
     originalSrcList = [];
 
-    // 遍历图片，同时拿到对应 item 的 base64Pic
+    // 1. 把图片替换成后端返回的 base64Pic（无网络请求）
     let iconIndex = 0;
     this.frames.forEach(frame => {
       frame.icons.forEach(item => {
         const img = imgs[iconIndex];
         if (img && item.icon.base64Pic) {
           originalSrcList.push(img.src);
-          // 直接用后端返回的 base64，无网络请求
           img.src = item.icon.base64Pic;
         }
         iconIndex++;
       });
     });
 
-    // 等待 DOM 渲染完成
-    await this.$nextTick();
-    await new Promise(r => setTimeout(r, 200));
+    // 2. 关键：强制等待所有 base64 图片加载完成
+    await Promise.all(
+      Array.from(imgs).map(img => {
+        return new Promise((resolve) => {
+          if (img.complete && img.naturalHeight > 0) {
+            resolve(); // 图片已经加载完成
+          } else {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          }
+        });
+      })
+    );
 
-    // 执行截图
+    // 再额外等待 300ms，确保浏览器把图片渲染到页面上
+    await new Promise(r => setTimeout(r, 300));
+
+    // 3. 截图（此时所有图片都已经渲染完成）
     const canvas = await html2canvas(container, {
       scale: 2,
       backgroundColor: null,
@@ -728,7 +740,7 @@ handleBottomDrop(e, item, idx) {
       allowTaint: false
     });
 
-    // 下载图片
+    // 4. 下载
     canvas.toBlob((blob) => {
       if (!blob) {
         this.$message.error("截图失败");

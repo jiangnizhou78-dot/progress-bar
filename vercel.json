@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+      {
+        "source": "/api/(.*)",
+        "destination": "https://progressbar-production-7a7b.up.railway.app/$1"
+      }
+    ]
+  }

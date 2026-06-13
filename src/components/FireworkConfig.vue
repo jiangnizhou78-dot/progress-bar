@@ -697,8 +697,22 @@ handleBottomDrop(e, item, idx) {
     let idx = 0;
     const originalSrcList = [];
 
-    // 保存原图
-    imgs.forEach(img => originalSrcList.push(img.src));
+    // 保存原图地址
+    imgs.forEach(img => {
+      originalSrcList.push(img.src);
+      // 给图片加上跨域属性
+      img.crossOrigin = 'anonymous';
+    });
+    // 等待所有图片加载完成
+    await Promise.all(Array.from(imgs).map(img => {
+      return new Promise((resolve, reject) => {
+        if (img.complete) resolve();
+        else {
+          img.onload = resolve;
+          img.onerror = resolve;
+        }
+      });
+    }));
 
     // 处理白线图标（你原来的代码，一行都不动）
     const promises = [];

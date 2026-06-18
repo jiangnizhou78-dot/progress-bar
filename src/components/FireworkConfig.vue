@@ -367,22 +367,12 @@ export default {
       return { backgroundImage: `url(${c})`, backgroundSize: 'cover', backgroundPosition: 'center' };
     },
     getSegmentStyle(c, len) {
-  const base = { 
-    width: '100%', 
-    margin: 0, 
-    padding: 0 
-  };
-  if (c.startsWith('#')) {
-    return { ...base, backgroundColor: c };
-  }
-  return { 
-    ...base, 
-    backgroundImage: `url(${c})`, 
-    backgroundSize: 'cover', 
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat'
-  };
-},
+      const base = { height: `${100 / len}%`, width: '100%' };
+      if (c.startsWith('#')) {
+        return { ...base, backgroundColor: c };
+      }
+      return { ...base, backgroundImage: `url(${c})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+    },
     fetchIconTypes() {
       try {
         this.loading = true;
@@ -1229,20 +1219,31 @@ this.frames.forEach(frame => {
   background-color: #0066cc;
   transform: scale(1.02);
 }
-/* 直接加到你的style里，解决颜色没有完全覆盖的问题 */
-.color-segment {
-  width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  box-sizing: border-box !important;
-  position: absolute !important;
-  left: 0 !important;
-  transform: translateZ(0);
+/* 最外层容器：去掉边框，只做裁剪 */
+.screenshot-container {
+  width: 1200px;
+  height: 250px;
+  overflow: hidden !important;
+  position: relative;
+  background: transparent;
+  border-radius: 16px;
+  box-shadow: none;
+  border: none !important; /* 去掉外层边框 */
 }
 
-.icon-bg-wrap {
-  padding: 0 !important;
-  margin: 0 !important;
+/* 内层时间线容器：加边框，边框和背景一体，完全没有缝隙 */
+.timeline-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
   overflow: hidden !important;
+  border-radius: 16px;
+  border: 3px solid #000 !important; /* 边框移到内层 */
+  box-sizing: border-box; /* 边框算在宽高内 */
+}
+
+/* 分镜圆角去掉，内层已经有边框和圆角了 */
+.first-frame, .last-frame {
+  border-radius: 0 !important;
 }
 </style>

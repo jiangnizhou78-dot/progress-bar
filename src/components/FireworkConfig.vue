@@ -703,33 +703,30 @@ handleBottomDrop(e, item, idx) {
     imgs.forEach(img => originalSrcList.push(img.src));
 
     // 处理白线图标（你原来的代码，一行都不动）
-    const promises = [];
-    this.frames.forEach(frame => {
-      frame.icons.forEach(item => {
-        const img = imgs[idx];
-        if (img && item.isWhiteLine) {
-          const p = new Promise((resolve) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const image = new Image();
-            image.crossOrigin = 'Anonymous';
-            image.onload = () => {
-              canvas.width = image.width;
-              canvas.height = image.height;
-              ctx.drawImage(image, 0, 0);
-              ctx.globalCompositeOperation = 'source-in';
-              ctx.fillStyle = '#FFF';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              img.src = canvas.toDataURL('image/png');
-              resolve();
-            };
-            image.src = originalSrcList[idx];
-          });
-          promises.push(p);
-        }
-        idx++;
+    // 处理白线图标（不重新请求图片）
+const promises = [];
+this.frames.forEach(frame => {
+  frame.icons.forEach(item => {
+    const img = imgs[idx];
+    if (img && item.isWhiteLine) {
+      const p = new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        // 直接用页面上已经加载好的img，不用重新请求！
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.drawImage(img, 0, 0);
+        ctx.globalCompositeOperation = 'source-in';
+        ctx.fillStyle = '#FFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        img.src = canvas.toDataURL('image/png');
+        resolve();
       });
-    });
+      promises.push(p);
+    }
+    idx++;
+  });
+});
 
     await Promise.all(promises);
     await new Promise(r => setTimeout(r, 20));

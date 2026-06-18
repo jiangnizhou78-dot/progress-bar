@@ -27,7 +27,7 @@
             <el-checkbox class="selection-box" v-model="selectedIcons" :label="icon" @change="handleSelectionChange">
               <br>
             </el-checkbox>
-            <img :src="imageBaseUrl + icon.picture" class="icon-image" crossorigin="anonymous" />
+            <img :src="imageBaseUrl + icon.picture" class="icon-image" :crossorigin="isDev ? 'anonymous' : undefined" />
             <div class="icon-name">{{ icon.iconName }}</div>
           </div>
         </div>
@@ -105,7 +105,7 @@
                 <div @click="changeSingleIcon(row, idx)"
                   style="cursor:pointer; display:flex; flex-direction:column; align-items:center;">
                   <img :src="imageBaseUrl + item.icon.picture" style="width:32px;height:32px;object-fit:contain;"
-                  crossorigin="anonymous"  
+                  :crossorigin="isDev ? 'anonymous' : undefined"  
                   :class="{ iconWhiteLine: item.isWhiteLine }">
                   <div
                     style="font-size:11px; color:#999; margin-top:3px; width:70px; text-align:center; white-space:nowrap;">
@@ -284,7 +284,7 @@
   <img 
     :src="imageBaseUrl + item.icon.picture" 
     class="final-icon-img"
-    crossorigin="anonymous"
+    :crossorigin="isDev ? 'anonymous' : undefined"
     :class="{ iconWhiteLine: item.isWhiteLine }"
     style="position: absolute; z-index: 9999 !important; left: 0; top: 0;"
   >
@@ -325,6 +325,8 @@ import html2canvas from 'html2canvas'
 export default {
   data() {
     return {
+      // 👇 加上这行，判断是不是开发环境
+    isDev: process.env.NODE_ENV === 'development',
       tempFrame: null,
       tempSelectedIcon: null,
       dragIndex: -1,

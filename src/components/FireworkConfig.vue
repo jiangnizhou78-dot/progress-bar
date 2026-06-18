@@ -367,12 +367,22 @@ export default {
       return { backgroundImage: `url(${c})`, backgroundSize: 'cover', backgroundPosition: 'center' };
     },
     getSegmentStyle(c, len) {
-      const base = { height: `${100 / len}%`, width: '100%' };
-      if (c.startsWith('#')) {
-        return { ...base, backgroundColor: c };
-      }
-      return { ...base, backgroundImage: `url(${c})`, backgroundSize: 'cover', backgroundPosition: 'center' };
-    },
+  const base = { 
+    width: '100%', 
+    margin: 0, 
+    padding: 0 
+  };
+  if (c.startsWith('#')) {
+    return { ...base, backgroundColor: c };
+  }
+  return { 
+    ...base, 
+    backgroundImage: `url(${c})`, 
+    backgroundSize: 'cover', 
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat'
+  };
+},
     fetchIconTypes() {
       try {
         this.loading = true;
@@ -1218,5 +1228,21 @@ this.frames.forEach(frame => {
 .download-btn:hover {
   background-color: #0066cc;
   transform: scale(1.02);
+}
+/* 直接加到你的style里，解决颜色没有完全覆盖的问题 */
+.color-segment {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  position: absolute !important;
+  left: 0 !important;
+  transform: translateZ(0);
+}
+
+.icon-bg-wrap {
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
 }
 </style>

@@ -27,7 +27,7 @@
             <el-checkbox class="selection-box" v-model="selectedIcons" :label="icon" @change="handleSelectionChange">
               <br>
             </el-checkbox>
-            <img :src="imageBaseUrl + icon.picture" class="icon-image" />
+            <img :src="imageBaseUrl + icon.picture" class="icon-image" crossorigin="anonymous" />
             <div class="icon-name">{{ icon.iconName }}</div>
           </div>
         </div>
@@ -105,7 +105,8 @@
                 <div @click="changeSingleIcon(row, idx)"
                   style="cursor:pointer; display:flex; flex-direction:column; align-items:center;">
                   <img :src="imageBaseUrl + item.icon.picture" style="width:32px;height:32px;object-fit:contain;"
-                    :class="{ iconWhiteLine: item.isWhiteLine }">
+                  crossorigin="anonymous"  
+                  :class="{ iconWhiteLine: item.isWhiteLine }">
                   <div
                     style="font-size:11px; color:#999; margin-top:3px; width:70px; text-align:center; white-space:nowrap;">
                     点击可更换图标</div>
@@ -262,7 +263,7 @@
     :style="{
       ...getSegmentStyle(c, item.colorList.length),
       height: item.enableBottomBar ? `${(100 / item.colorList.length) * 0.9}%` : `${100 / item.colorList.length}%`,
-      position: relative
+      position: 'relative'
     }"
   ></div>
 
@@ -283,6 +284,7 @@
   <img 
     :src="imageBaseUrl + item.icon.picture" 
     class="final-icon-img"
+    crossorigin="anonymous"
     :class="{ iconWhiteLine: item.isWhiteLine }"
     style="position: absolute; z-index: 9999 !important; left: 0; top: 0;"
   >
@@ -702,7 +704,7 @@ handleBottomDrop(e, item, idx) {
     // 保存原图
     imgs.forEach(img => originalSrcList.push(img.src));
 
-    // 处理白线图标（你原来的代码，一行都不动）
+    
     // 处理白线图标（不重新请求图片）
 const promises = [];
 this.frames.forEach(frame => {

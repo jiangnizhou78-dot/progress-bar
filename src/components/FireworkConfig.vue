@@ -44,8 +44,8 @@
 
       <div class="config-area">
         <el-form :inline="true">
-          <el-form-item label="数量 (1-10)">
-            <el-input-number v-model="config.frameCount" :min="1" :max="10" @change="handleFrameCountChange" />
+          <el-form-item label="数量 (1-500)">
+            <el-input-number v-model="config.frameCount" :min="1" :max="500" @change="handleFrameCountChange" />
           </el-form-item>
           <el-form-item label="单个最久（秒）">
             <el-input-number v-model="config.maxSingle" :min="1" />
